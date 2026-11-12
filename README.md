@@ -3,7 +3,7 @@
 Aplicativo desktop para registrar as horas trabalhadas, acompanhar a meta mensal de cada empresa e saber, enquanto o dia é preenchido, a que horas é possível sair mais cedo ou é preciso sair mais tarde.
 
 - Funciona offline: não há servidor, conta ou envio de dados.
-- Os registros ficam somente no computador de quem usa, fora da pasta do programa.
+- Os registros ficam somente no computador de quem usa, cifrados com uma senha definida na primeira abertura.
 - Várias empresas, cada uma com sua meta e jornada — útil ao trocar de trabalho ou ter mais de um.
 
 ## Instalação (Windows)
@@ -14,23 +14,40 @@ Aplicativo desktop para registrar as horas trabalhadas, acompanhar a meta mensal
 
 O instalador não é assinado digitalmente, então o Windows SmartScreen pode exibir um aviso: escolha "Mais informações" e "Executar assim mesmo".
 
-Na primeira abertura, informe o nome da empresa e as horas a cumprir por mês (padrão **152:00**, com jornada de **08:00** por dia).
+Na primeira abertura:
+
+1. Crie a senha do aplicativo (mínimo de 6 caracteres). Ela será pedida sempre que o aplicativo abrir.
+2. Anote o **código de recuperação** exibido em seguida. Ele aparece uma única vez e é a única forma de recuperar os registros se a senha for esquecida.
+3. Cadastre uma ou mais empresas, cada uma com as horas a cumprir por mês (padrão **152:00**, com jornada de **08:00** por dia).
 
 ## Funcionalidades
 
-- **Empresas**: cadastre quantas quiser e alterne entre elas. Cada uma guarda sua meta mensal, jornada diária, almoço padrão e registros.
+- **Senha**: tela de senha ao abrir, botão "Bloquear", troca de senha e recuperação por código.
+- **Empresas**: cadastre quantas quiser, inclusive várias em sequência, e alterne entre elas. Cada uma guarda sua meta mensal, jornada diária, almoço padrão e registros.
+- **Visão geral**: com duas ou mais empresas, uma tabela mostra meta, horas trabalhadas, quanto falta e saldo de cada uma no mês, com o total.
 - **Meta só de um mês**: ajuste a meta de um mês específico (por exemplo, o mês de entrada ou de saída da empresa) sem mudar a meta padrão.
 - **Registro diário**: entrada, saída para o almoço, retorno e saída. O almoço é opcional.
+- **Almoço**: a duração registrada aparece em cada dia e somada no mês, e não conta como hora trabalhada. Durante o almoço, o painel "Hoje" mostra o retorno previsto.
 - **Resumo do mês**: trabalhado, quanto falta para a meta, saldo (banco) frente à jornada diária e projeção de fechamento.
 - **Painel "Hoje"**: com a entrada preenchida, mostra a saída para cumprir a jornada e a saída ajustada pelo saldo acumulado — mais cedo se o saldo é positivo, mais tarde se é negativo. Enquanto o retorno do almoço não é informado, considera o almoço padrão.
 - **Média necessária**: horas por dia útil restante para fechar a meta.
 - **Validação**: aponta horários fora de ordem ou incompletos em cada dia.
 - **Tipos de dia**: trabalho, feriado/folga (não conta) e abono/atestado (credita a jornada diária).
-- **Backup**: exportação/importação em JSON (todas as empresas) e exportação do mês em CSV.
+- **Backup**: exportação/importação em JSON (todas as empresas) e exportação do mês em CSV. Os arquivos exportados não são cifrados.
 
 ## Onde ficam os dados
 
 No aplicativo instalado, em `%APPDATA%\Registro de Horas\dados.json` (o caminho exato aparece no rodapé da seção "Empresa e metas"). A cada gravação, a versão anterior é mantida em `dados.json.bak`. Desinstalar o programa não apaga esses arquivos.
+
+### Como a senha protege os dados
+
+- O conteúdo é cifrado com AES-256-GCM por uma chave aleatória.
+- Essa chave é guardada cifrada duas vezes: por uma chave derivada da senha e por outra derivada do código de recuperação, ambas com scrypt.
+- Nem a senha nem o código são armazenados. Sem um dos dois, não há como ler os registros.
+- A chave fica apenas na memória enquanto o aplicativo está desbloqueado.
+- Tentativas erradas seguidas sofrem atraso crescente.
+
+A proteção vale para o arquivo em disco. Ela não protege contra alguém com acesso ao computador enquanto o aplicativo está aberto e desbloqueado. A versão para navegador (`npm run web`) é voltada ao desenvolvimento e não tem senha.
 
 Este repositório contém apenas código: nenhum registro de horas faz parte dele, e o `.gitignore` bloqueia arquivos de dados e de backup.
 
@@ -38,7 +55,8 @@ Este repositório contém apenas código: nenhum registro de horas faz parte del
 
 | Item | Regra |
 | --- | --- |
-| Total do dia | `(saída − entrada) − (retorno − saída almoço)` |
+| Almoço | `retorno − saída almoço` |
+| Total do dia | `(saída − entrada) − almoço` |
 | Saldo do dia | total − jornada diária (em fins de semana e feriados, tudo conta como extra) |
 | Faltam | meta do mês − trabalhado |
 | Dias úteis restantes | dias de segunda a sexta, de hoje em diante, ainda não concluídos e não marcados como folga/abono |
@@ -71,7 +89,8 @@ Estrutura:
 - [js/calc.js](js/calc.js): regras de cálculo, sem DOM.
 - [js/model.js](js/model.js): modelo de dados (empresas, metas, migração de formatos antigos).
 - [js/app.js](js/app.js): interface.
-- [electron/main.js](electron/main.js) e [electron/preload.js](electron/preload.js): janela e gravação do arquivo de dados.
+- [electron/cofre.js](electron/cofre.js): criptografia do arquivo de dados, senha e código de recuperação.
+- [electron/main.js](electron/main.js) e [electron/preload.js](electron/preload.js): janela, bloqueio e gravação do arquivo de dados.
 
 A variável de ambiente `HORAS_DATA_DIR` aponta o aplicativo para outra pasta de dados, o que é útil em testes.
 

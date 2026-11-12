@@ -17,7 +17,7 @@
 
   const $ = (id) => document.getElementById(id);
 
-  let state = load();
+  let state = M.normalizar(null);
   const now = new Date();
   let view = { year: now.getFullYear(), month: now.getMonth() + 1 };
   const rows = new Map(); // iso -> referências dos elementos da linha
@@ -32,11 +32,8 @@
 
   // ---------- Persistência ----------
 
-  function load() {
+  function parse(raw) {
     try {
-      const raw = desktop
-        ? desktop.carregar()
-        : localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_KEY);
       return M.normalizar(raw ? JSON.parse(raw) : null);
     } catch (err) {
       console.error('Falha ao ler os dados salvos', err);
@@ -44,10 +41,19 @@
     }
   }
 
+  /** Versão para navegador: lê do localStorage. No aplicativo, os dados chegam ao desbloquear. */
+  function loadFromBrowser() {
+    try {
+      return parse(localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_KEY));
+    } catch (err) {
+      return parse(null);
+    }
+  }
+
   function save() {
     const json = JSON.stringify(state);
     try {
-      if (desktop) desktop.salvar(json).catch(saveFailed);
+      if (desktop) desktop.salvar(json).then((r) => { if (!r.ok) saveFailed(r.erro); }, saveFailed);
       else localStorage.setItem(STORAGE_KEY, json);
     } catch (err) {
       saveFailed(err);
@@ -113,16 +119,17 @@
         tr.append(el('td', null, [input]));
       }
 
+      const lunch = el('td', { className: 'num' });
       const total = el('td', { className: 'num' });
       const balance = el('td', { className: 'num' });
       const obs = el('input', { type: 'text', value: rec.obs || '', maxLength: M.MAX_OBS, ariaLabel: 'Observação dia ' + d });
       obs.addEventListener('change', () => setField(iso, 'obs', obs.value.trim()));
-      tr.append(total, balance, el('td', { className: 'obs' }, [obs]));
+      tr.append(lunch, total, balance, el('td', { className: 'obs' }, [obs]));
 
-      const msgCell = el('td', { colSpan: 9 });
+      const msgCell = el('td', { colSpan: 10 });
       const msgRow = el('tr', { className: 'msg', hidden: true }, [msgCell]);
       body.append(tr, msgRow);
-      rows.set(iso, { tr, total, balance, msgRow, msgCell });
+      rows.set(iso, { tr, lunch, total, balance, msgRow, msgCell });
     }
   }
 
@@ -149,6 +156,7 @@
       const r = rows.get(p.iso);
       const rec = dias[p.iso] || {};
       r.tr.classList.toggle('off', p.tipo !== H.TIPOS.TRABALHO);
+      r.lunch.textContent = p.lunch ? H.formatDuration(p.lunch) : '';
       r.total.textContent = p.empty ? '' : H.formatDuration(p.minutes);
       r.balance.className = 'num';
       if (p.balance === null) r.balance.textContent = '';
@@ -171,7 +179,8 @@
     const pct = sum.goal > 0 ? Math.min(100, Math.round((sum.worked / sum.goal) * 100)) : 100;
     $('progressBar').style.width = pct + '%';
     $('progress').setAttribute('aria-valuenow', String(pct));
-    $('sumGoal').textContent = pct + '% da meta de ' + H.formatDuration(sum.goal);
+    $('sumGoal').textContent = pct + '% da meta de ' + H.formatDuration(sum.goal) +
+      (sum.lunchTotal ? ' · almoço no mês: ' + H.formatDuration(sum.lunchTotal) : '');
 
     const missing = $('sumMissing');
     if (sum.missing > 0) {
@@ -205,6 +214,7 @@
       (diff >= 0 ? 'sobra ' : 'falta ') + H.formatDuration(Math.abs(diff));
 
     renderToday(sum, today, s);
+    renderEmpresas(today);
   }
 
   function renderToday(sum, today, s) {
@@ -231,6 +241,11 @@
       const sug = H.exitSuggestions(rec, sum.balance, s);
       const assumed = H.parseTime(rec.retornoAlmoco) === null
         ? ' (considerando almoço de ' + H.formatDuration(s.almocoPadrao) + ')' : '';
+      const saiuAlmoco = H.parseTime(rec.saidaAlmoco);
+      if (saiuAlmoco !== null && H.parseTime(rec.retornoAlmoco) === null) {
+        line('Em horário de almoço desde ', bold(rec.saidaAlmoco), ': retorno previsto para ',
+          bold(clock(saiuAlmoco + s.almocoPadrao)), '. Registre o retorno para contar o almoço real.');
+      }
       line('Para cumprir ', bold(H.formatDuration(s.jornadaDiaria)), ' hoje, saia às ', bold(clock(sug.normal)), assumed, '.');
       if (sum.balance > 0) {
         line('Saldo acumulado de ', bold(H.formatDuration(sum.balance, true)), ': você pode sair mais cedo, às ',
@@ -248,6 +263,51 @@
         ' por dia nos ', bold(String(sum.remainingWorkdays)), ' dia(s) útil(eis) restante(s).');
     }
     $('todayBody').replaceChildren(el('ul', null, items));
+  }
+
+  // ---------- Visão geral das empresas ----------
+
+  /** Tabela com a situação de todas as empresas no mês em exibição (aparece a partir de duas). */
+  function renderEmpresas(today) {
+    const panel = $('empresasPanel');
+    panel.hidden = state.empresas.length < 2;
+    if (panel.hidden) return;
+    const tot = { goal: 0, worked: 0, missing: 0, balance: 0 };
+    const signed = (minutes) => {
+      const td = el('td', { className: 'num' });
+      setSigned(td, minutes);
+      return td;
+    };
+    const linhas = state.empresas.map((e) => {
+      const sum = H.summarizeMonth(view.year, view.month, e.dias, M.configDoMes(e, view.year, view.month), today);
+      for (const k of Object.keys(tot)) tot[k] += sum[k];
+      const ativa = e.id === state.empresaAtiva;
+      const abrir = el('button', { type: 'button', textContent: ativa ? 'Em uso' : 'Abrir', disabled: ativa });
+      abrir.addEventListener('click', () => selecionarEmpresa(e.id));
+      return el('tr', { className: ativa ? 'ativa' : '' }, [
+        el('td', { textContent: e.nome }),
+        el('td', { className: 'num', textContent: H.formatDuration(sum.goal) }),
+        el('td', { className: 'num', textContent: H.formatDuration(sum.worked) }),
+        el('td', { className: 'num', textContent: sum.missing ? H.formatDuration(sum.missing) : 'Meta atingida' }),
+        signed(sum.balance),
+        el('td', null, [abrir]),
+      ]);
+    });
+    $('empresasBody').replaceChildren(...linhas);
+    $('empresasFoot').replaceChildren(el('tr', null, [
+      el('td', { textContent: 'Total (' + state.empresas.length + ' empresas)' }),
+      el('td', { className: 'num', textContent: H.formatDuration(tot.goal) }),
+      el('td', { className: 'num', textContent: H.formatDuration(tot.worked) }),
+      el('td', { className: 'num', textContent: H.formatDuration(tot.missing) }),
+      signed(tot.balance),
+      el('td'),
+    ]));
+  }
+
+  function selecionarEmpresa(id) {
+    state.empresaAtiva = id;
+    save();
+    render();
   }
 
   // ---------- Mês e empresa ----------
@@ -367,13 +427,38 @@
       ? 'Informe a empresa e as horas a cumprir por mês para começar a registrar.'
       : 'Os registros das outras empresas são mantidos. Você pode alternar entre elas a qualquer momento.';
     $('novaCancelar').hidden = primeira;
+    $('novaCancelar').textContent = 'Cancelar';
     $('novaImportar').hidden = !primeira;
+    $('novaLista').textContent = '';
+    limparEmpresaForm();
+    dialog.showModal();
+    $('novaNome').focus();
+  }
+
+  function limparEmpresaForm() {
     $('novaNome').value = '';
     $('novaMeta').value = H.formatDuration(H.DEFAULT_SETTINGS.metaMensal);
     $('novaJornada').value = H.formatDuration(H.DEFAULT_SETTINGS.jornadaDiaria);
     $('novaErro').textContent = '';
-    dialog.showModal();
-    $('novaNome').focus();
+  }
+
+  /** Valida o formulário e cadastra a empresa. Retorna a empresa criada ou null se houver erro. */
+  function criarEmpresaDoForm() {
+    const nome = $('novaNome').value.trim();
+    const meta = H.parseDuration($('novaMeta').value);
+    const jornada = H.parseDuration($('novaJornada').value);
+    let erro = '';
+    if (!nome) erro = 'Informe o nome da empresa.';
+    else if (state.empresas.some((e) => e.nome.toLowerCase() === nome.toLowerCase())) erro = 'Já existe uma empresa com esse nome.';
+    else if (!meta) erro = 'Horas por mês: use o formato hh:mm (ex.: 152:00).';
+    else if (!jornada) erro = 'Jornada diária: use o formato hh:mm (ex.: 08:00).';
+    $('novaErro').textContent = erro;
+    if (erro) return null;
+    const nova = M.novaEmpresa({ nome, metaMensal: meta, jornadaDiaria: jornada });
+    state.empresas.push(nova);
+    if (!empresa()) state.empresaAtiva = nova.id;
+    save();
+    return nova;
   }
 
   function bindEmpresaDialog() {
@@ -382,25 +467,31 @@
     dialog.addEventListener('cancel', (ev) => {
       if (state.empresas.length === 0) ev.preventDefault();
     });
-    $('novaCancelar').addEventListener('click', () => dialog.close());
+    $('novaCancelar').addEventListener('click', () => {
+      dialog.close();
+      render();
+    });
     $('novaImportar').addEventListener('click', () => $('importFile').click());
     $('empresaForm').addEventListener('submit', (ev) => {
       ev.preventDefault();
-      const nome = $('novaNome').value.trim();
-      const meta = H.parseDuration($('novaMeta').value);
-      const jornada = H.parseDuration($('novaJornada').value);
-      let erro = '';
-      if (!nome) erro = 'Informe o nome da empresa.';
-      else if (!meta) erro = 'Horas por mês: use o formato hh:mm (ex.: 152:00).';
-      else if (!jornada) erro = 'Jornada diária: use o formato hh:mm (ex.: 08:00).';
-      $('novaErro').textContent = erro;
-      if (erro) return;
-      const nova = M.novaEmpresa({ nome, metaMensal: meta, jornadaDiaria: jornada });
-      state.empresas.push(nova);
+      const nova = criarEmpresaDoForm();
+      if (!nova) return;
       state.empresaAtiva = nova.id;
       save();
       dialog.close();
       render();
+    });
+    // Cadastro em sequência: grava a empresa e mantém o diálogo aberto para a próxima.
+    $('novaOutra').addEventListener('click', () => {
+      const nova = criarEmpresaDoForm();
+      if (!nova) return;
+      limparEmpresaForm();
+      $('novaCancelar').hidden = false;
+      $('novaCancelar').textContent = 'Concluir';
+      $('novaImportar').hidden = true;
+      $('novaLista').textContent = 'Cadastradas: ' +
+        state.empresas.map((e) => e.nome + ' (' + H.formatDuration(e.metaMensal) + ')').join(', ') + '.';
+      $('novaNome').focus();
     });
   }
 
@@ -449,20 +540,136 @@
     const e = empresa();
     const sum = H.summarizeMonth(view.year, view.month, e.dias, config(), todayISO());
     const quote = (v) => '"' + String(v === undefined || v === null ? '' : v).replace(/"/g, '""') + '"';
-    const lines = [['Data', 'Tipo', 'Entrada', 'Saída almoço', 'Retorno', 'Saída', 'Total', 'Saldo', 'Observação']];
+    const lines = [['Data', 'Tipo', 'Entrada', 'Saída almoço', 'Retorno', 'Saída', 'Almoço', 'Total', 'Saldo', 'Observação']];
     for (const p of sum.perDay) {
       const rec = e.dias[p.iso] || {};
       lines.push([
         p.iso, p.tipo, rec.entrada, rec.saidaAlmoco, rec.retornoAlmoco, rec.saida,
+        p.lunch ? H.formatDuration(p.lunch) : '',
         p.empty ? '' : H.formatDuration(p.minutes),
         p.balance === null ? '' : H.formatDuration(p.balance, true),
         rec.obs,
       ]);
     }
-    lines.push(['Total', e.nome, '', '', '', '', H.formatDuration(sum.worked), H.formatDuration(sum.balance, true),
+    lines.push(['Total', e.nome, '', '', '', '', H.formatDuration(sum.lunchTotal), H.formatDuration(sum.worked), H.formatDuration(sum.balance, true),
       'Meta ' + H.formatDuration(sum.goal)]);
     const csv = '﻿' + lines.map((l) => l.map(quote).join(';')).join('\r\n');
     download('horas-' + M.chaveMes(view.year, view.month) + '.csv', csv, 'text/csv;charset=utf-8');
+  }
+
+  // ---------- Senha (aplicativo instalado) ----------
+
+  const MIN_SENHA = 6;
+  let authModo = 'entrar'; // 'criar' | 'entrar' | 'recuperar'
+
+  function setAuthModo(modo) {
+    authModo = modo;
+    const textos = {
+      criar: ['Crie sua senha', 'Ela protege seus registros neste computador e será pedida sempre que o aplicativo abrir. Mínimo de ' + MIN_SENHA + ' caracteres.', 'Senha', 'Criar senha', ''],
+      entrar: ['Digite sua senha', '', 'Senha', 'Entrar', 'Esqueci a senha'],
+      recuperar: ['Recuperar acesso', 'Informe o código de recuperação exibido quando a senha foi criada e defina uma nova senha.', 'Nova senha', 'Redefinir senha', 'Voltar'],
+    }[modo];
+    $('authTitle').textContent = textos[0];
+    $('authIntro').textContent = textos[1];
+    $('authIntro').hidden = !textos[1];
+    $('authSenhaLabel').textContent = textos[2];
+    $('authEnviar').textContent = textos[3];
+    $('authAlternar').textContent = textos[4];
+    $('authAlternar').hidden = !textos[4];
+    $('authCodigoWrap').hidden = modo !== 'recuperar';
+    $('authConfirmaWrap').hidden = modo === 'entrar';
+    for (const id of ['authCodigo', 'authSenha', 'authConfirma']) $(id).value = '';
+    $('authErro').textContent = '';
+    $(modo === 'recuperar' ? 'authCodigo' : 'authSenha').focus();
+  }
+
+  function validarNovaSenha(senha, confirma) {
+    if (senha.length < MIN_SENHA) return 'A senha deve ter pelo menos ' + MIN_SENHA + ' caracteres.';
+    if (senha !== confirma) return 'As senhas não conferem.';
+    return '';
+  }
+
+  function entrar(dados) {
+    state = parse(dados);
+    $('auth').hidden = true;
+    document.body.classList.remove('locked');
+    render();
+  }
+
+  async function enviarAuth(ev) {
+    ev.preventDefault();
+    const senha = $('authSenha').value;
+    let erro = '';
+    if (authModo === 'entrar') erro = senha ? '' : 'Digite sua senha.';
+    else erro = validarNovaSenha(senha, $('authConfirma').value);
+    if (authModo === 'recuperar' && !$('authCodigo').value.trim()) erro = 'Informe o código de recuperação.';
+    $('authErro').textContent = erro;
+    if (erro) return;
+
+    $('authEnviar').disabled = true;
+    let r;
+    try {
+      if (authModo === 'criar') r = await desktop.criar(senha);
+      else if (authModo === 'entrar') r = await desktop.abrir(senha);
+      else r = await desktop.recuperar($('authCodigo').value, senha);
+    } catch (err) {
+      r = { ok: false, erro: String(err && err.message ? err.message : err) };
+    }
+    $('authEnviar').disabled = false;
+    for (const id of ['authSenha', 'authConfirma']) $(id).value = '';
+    if (!r.ok) {
+      $('authErro').textContent = r.erro;
+      $('authSenha').focus();
+      return;
+    }
+    if (authModo !== 'criar') {
+      entrar(r.dados);
+      return;
+    }
+    // Senha criada: mostra o código de recuperação uma única vez antes de abrir as telas.
+    $('authForm').hidden = true;
+    $('authCodigoPanel').hidden = false;
+    $('codigoGerado').textContent = r.codigo;
+    $('codigoContinuar').onclick = () => {
+      $('codigoGerado').textContent = '';
+      entrar(r.dados);
+    };
+    $('codigoContinuar').focus();
+  }
+
+  function bindSenha() {
+    $('authForm').addEventListener('submit', enviarAuth);
+    $('authAlternar').addEventListener('click', () => setAuthModo(authModo === 'entrar' ? 'recuperar' : 'entrar'));
+    $('bloquearBtn').hidden = false;
+    $('bloquearBtn').addEventListener('click', () => desktop.bloquear());
+
+    const dialog = $('senhaDialog');
+    $('trocarSenhaBtn').hidden = false;
+    $('trocarSenhaBtn').addEventListener('click', () => {
+      for (const id of ['senhaAtual', 'senhaNova', 'senhaConfirma']) $(id).value = '';
+      $('senhaErro').textContent = '';
+      dialog.showModal();
+      $('senhaAtual').focus();
+    });
+    $('senhaCancelar').addEventListener('click', () => dialog.close());
+    $('senhaForm').addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const erro = validarNovaSenha($('senhaNova').value, $('senhaConfirma').value);
+      $('senhaErro').textContent = erro;
+      if (erro) return;
+      $('senhaSalvar').disabled = true;
+      const r = await desktop.trocarSenha($('senhaAtual').value, $('senhaNova').value)
+        .catch((err) => ({ ok: false, erro: String(err.message || err) }));
+      $('senhaSalvar').disabled = false;
+      for (const id of ['senhaAtual', 'senhaNova', 'senhaConfirma']) $(id).value = '';
+      if (!r.ok) {
+        $('senhaErro').textContent = r.erro;
+        $('senhaAtual').focus();
+        return;
+      }
+      dialog.close();
+      alert('Senha alterada. O código de recuperação continua o mesmo.');
+    });
   }
 
   // ---------- Inicialização ----------
@@ -476,11 +683,7 @@
     const row = rows.get(todayISO());
     if (row) row.tr.scrollIntoView({ block: 'center' });
   });
-  $('empresaSelect').addEventListener('change', () => {
-    state.empresaAtiva = $('empresaSelect').value;
-    save();
-    render();
-  });
+  $('empresaSelect').addEventListener('change', () => selecionarEmpresa($('empresaSelect').value));
   $('novaEmpresaBtn').addEventListener('click', openEmpresaDialog);
   $('exportJson').addEventListener('click', exportJson);
   $('exportCsv').addEventListener('click', exportCsv);
@@ -492,9 +695,18 @@
 
   $('version').textContent = 'Registro de Horas v' + H.VERSION;
   $('storageHint').textContent = desktop
-    ? 'Os registros ficam salvos somente neste computador, em ' + desktop.caminho + '. Exporte um backup periodicamente.'
-    : 'Os registros ficam salvos apenas neste navegador (localStorage). Exporte um backup periodicamente.';
+    ? 'Os registros ficam cifrados com a sua senha, somente neste computador, em ' + desktop.caminho +
+      '. O backup exportado em JSON não é cifrado: guarde-o em local seguro.'
+    : 'Os registros ficam salvos apenas neste navegador (localStorage), sem senha. Exporte um backup periodicamente.';
   bindSettings();
   bindEmpresaDialog();
-  render();
+  if (desktop) {
+    bindSenha();
+    $('auth').hidden = false;
+    setAuthModo(desktop.estado === 'novo' ? 'criar' : 'entrar');
+  } else {
+    state = loadFromBrowser();
+    document.body.classList.remove('locked');
+    render();
+  }
 })();

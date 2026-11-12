@@ -1,11 +1,13 @@
 'use strict';
 /*
  * Processo principal do aplicativo desktop.
- * Os registros ficam em <dados do usuário>/dados.json, fora da pasta do programa e do repositório.
+ * Os registros ficam cifrados em <dados do usuário>/dados.json, fora da pasta do programa e do
+ * repositório. A chave só existe em memória enquanto o aplicativo está desbloqueado.
  */
 const { app, BrowserWindow, Menu, ipcMain, shell } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
+const cofre = require('./cofre.js');
 
 const ROOT = path.join(__dirname, '..');
 const MAX_BYTES = 20 * 1024 * 1024;
@@ -15,42 +17,149 @@ if (process.env.HORAS_DATA_DIR) app.setPath('userData', path.resolve(process.env
 
 const dataFile = () => path.join(app.getPath('userData'), 'dados.json');
 
-function lerDados() {
+let envelope = null; // conteúdo cifrado, como está em disco
+let chave = null; // chave de dados; null = bloqueado
+let legado = null; // dados sem senha gravados por versões anteriores, aguardando a criação da senha
+let falhas = 0;
+let fila = Promise.resolve();
+
+/** Lê o arquivo de dados (ou a cópia de segurança, se o principal estiver corrompido). */
+function carregarArquivo() {
+  envelope = null;
+  legado = null;
   for (const file of [dataFile(), dataFile() + '.bak']) {
     try {
       const text = fs.readFileSync(file, 'utf8');
-      JSON.parse(text); // arquivo corrompido: tenta a cópia de segurança
-      return text;
+      const obj = JSON.parse(text);
+      if (cofre.ehCofre(obj)) envelope = obj;
+      else legado = text;
+      return;
     } catch (err) {
       if (err.code !== 'ENOENT') console.error('Falha ao ler ' + file + ': ' + err.message);
     }
   }
-  return null;
 }
 
-let fila = Promise.resolve();
-
 /** Grava de forma atômica (arquivo temporário + rename) e mantém a versão anterior em .bak. */
-function salvarDados(json) {
-  if (typeof json !== 'string' || json.length > MAX_BYTES) throw new Error('Conteúdo inválido.');
-  JSON.parse(json);
+function gravarArquivo(conteudo, manterAnterior) {
   const file = dataFile();
   const gravar = async () => {
     await fs.promises.mkdir(path.dirname(file), { recursive: true });
     const tmp = file + '.tmp';
-    await fs.promises.writeFile(tmp, json, 'utf8');
-    await fs.promises.copyFile(file, file + '.bak').catch((err) => {
-      if (err.code !== 'ENOENT') throw err;
-    });
+    await fs.promises.writeFile(tmp, conteudo, 'utf8');
+    if (manterAnterior) {
+      await fs.promises.copyFile(file, file + '.bak').catch((err) => {
+        if (err.code !== 'ENOENT') throw err;
+      });
+    } else {
+      // A versão anterior não era cifrada: não pode sobrar em disco.
+      await fs.promises.rm(file + '.bak', { force: true });
+    }
     await fs.promises.rename(tmp, file);
   };
   fila = fila.then(gravar, gravar);
   return fila;
 }
 
+const persistir = (manterAnterior) => gravarArquivo(JSON.stringify(envelope), manterAnterior);
+
 function origemConfiavel(event) {
   const frame = event.senderFrame;
   return !!frame && frame.url.startsWith('file://');
+}
+
+/** Atraso crescente após tentativas erradas, para dificultar adivinhação. */
+function penalidade() {
+  const ms = Math.min(falhas * 500, 5000);
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Registra um handler que responde { ok: true, ... } ou { ok: false, erro }. */
+function responder(canal, fn) {
+  ipcMain.handle(canal, async (event, ...args) => {
+    if (!origemConfiavel(event)) return { ok: false, erro: 'Origem não permitida.' };
+    try {
+      return { ok: true, ...(await fn(...args)) };
+    } catch (err) {
+      if (!(err instanceof cofre.SenhaIncorreta)) console.error(canal + ': ' + err.message);
+      return { ok: false, erro: err.message };
+    }
+  });
+}
+
+function registrarIpc() {
+  // Chamado a cada carga da página: recarregar a interface sempre volta ao estado bloqueado.
+  ipcMain.on('cofre:estado', (event) => {
+    chave = null;
+    if (origemConfiavel(event)) carregarArquivo();
+    event.returnValue = envelope ? 'bloqueado' : 'novo';
+  });
+  ipcMain.on('dados:caminho', (event) => {
+    event.returnValue = origemConfiavel(event) ? dataFile() : '';
+  });
+
+  responder('cofre:criar', async (senha) => {
+    if (envelope) throw new Error('Já existe uma senha configurada.');
+    const novo = await cofre.criar(senha, legado);
+    envelope = novo.envelope;
+    chave = novo.chave;
+    await persistir(false);
+    const dados = legado;
+    legado = null;
+    return { codigo: novo.codigo, dados };
+  });
+
+  const tentar = async (abrir) => {
+    if (!envelope) throw new Error('Nenhuma senha configurada.');
+    await penalidade();
+    try {
+      const aberto = await abrir();
+      falhas = 0;
+      return aberto;
+    } catch (err) {
+      if (err instanceof cofre.SenhaIncorreta) falhas++;
+      throw err;
+    }
+  };
+
+  responder('cofre:abrir', async (senha) => {
+    const aberto = await tentar(() => cofre.abrir(envelope, senha));
+    chave = aberto.chave;
+    return { dados: aberto.json };
+  });
+
+  responder('cofre:recuperar', async (codigo, novaSenha) => {
+    const aberto = await tentar(() => cofre.abrirComCodigo(envelope, codigo));
+    envelope = await cofre.definirSenha(envelope, aberto.chave, novaSenha);
+    chave = aberto.chave;
+    await persistir(true);
+    return { dados: aberto.json };
+  });
+
+  responder('cofre:trocar-senha', async (atual, nova) => {
+    if (!chave) throw new Error('Aplicativo bloqueado.');
+    await tentar(() => cofre.abrir(envelope, atual));
+    envelope = await cofre.definirSenha(envelope, chave, nova);
+    await persistir(true);
+    return {};
+  });
+
+  responder('dados:salvar', async (json) => {
+    if (!chave) throw new Error('Aplicativo bloqueado.');
+    if (typeof json !== 'string' || json.length > MAX_BYTES) throw new Error('Conteúdo inválido.');
+    JSON.parse(json);
+    envelope = cofre.gravarDados(envelope, chave, json);
+    await persistir(true);
+    return {};
+  });
+
+  responder('cofre:bloquear', async () => {
+    await fila.catch(() => {});
+    chave = null;
+    const [win] = BrowserWindow.getAllWindows();
+    if (win) win.webContents.reload();
+    return {};
+  });
 }
 
 function criarJanela() {
@@ -93,16 +202,7 @@ if (!app.requestSingleInstanceLock()) {
     }
   });
 
-  ipcMain.on('dados:carregar', (event) => {
-    event.returnValue = origemConfiavel(event) ? lerDados() : null;
-  });
-  ipcMain.on('dados:caminho', (event) => {
-    event.returnValue = origemConfiavel(event) ? dataFile() : '';
-  });
-  ipcMain.handle('dados:salvar', (event, json) => {
-    if (!origemConfiavel(event)) throw new Error('Origem não permitida.');
-    return salvarDados(json);
-  });
+  registrarIpc();
 
   app.whenReady().then(() => {
     Menu.setApplicationMenu(null);

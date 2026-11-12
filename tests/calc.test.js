@@ -120,3 +120,16 @@ test('dia em andamento não é contado em dobro na projeção', () => {
   assert.equal(sum.remainingWorkdays, 1);
   assert.equal(sum.projected, 480);
 });
+
+test('almoço registrado é medido e não conta como trabalho', () => {
+  const ev = H.evaluateDay(full('08:00', '12:00', '13:30', '17:30'), S);
+  assert.deepEqual([ev.minutes, ev.lunch], [480, 90]);
+  assert.equal(H.evaluateDay({ entrada: '08:00', saida: '14:00' }, S).lunch, 0);
+  // almoço já encerrado em um dia ainda em andamento
+  assert.equal(H.evaluateDay({ entrada: '08:00', saidaAlmoco: '12:00', retornoAlmoco: '12:45' }, S).lunch, 45);
+  const sum = H.summarizeMonth(2026, 11, {
+    '2026-11-02': full('08:00', '12:00', '13:00', '17:00'),
+    '2026-11-03': full('08:00', '12:00', '12:30', '16:30'),
+  }, S, '2026-11-04');
+  assert.equal(sum.lunchTotal, 90);
+});

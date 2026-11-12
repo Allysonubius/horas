@@ -10,7 +10,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  const VERSION = '2.0.0';
+  const VERSION = '2.1.0';
 
   const DEFAULT_SETTINGS = Object.freeze({
     metaMensal: 152 * 60, // 152:00
@@ -80,15 +80,15 @@
   /**
    * Avalia o registro de um dia.
    * rec: { entrada, saidaAlmoco, retornoAlmoco, saida, tipo }
-   * Retorna { minutes, complete, empty, errors[] }.
+   * Retorna { minutes, lunch, complete, empty, errors[] } — `lunch` é a duração do almoço registrado.
    * - Almoço é opcional, mas saída e retorno do almoço precisam ser informados juntos.
    */
   function evaluateDay(rec, settings) {
     const s = settings || DEFAULT_SETTINGS;
     const r = rec || {};
     const tipo = r.tipo || TIPOS.TRABALHO;
-    if (tipo === TIPOS.FOLGA) return { minutes: 0, complete: true, empty: false, errors: [] };
-    if (tipo === TIPOS.ABONO) return { minutes: s.jornadaDiaria, complete: true, empty: false, errors: [] };
+    if (tipo === TIPOS.FOLGA) return { minutes: 0, lunch: 0, complete: true, empty: false, errors: [] };
+    if (tipo === TIPOS.ABONO) return { minutes: s.jornadaDiaria, lunch: 0, complete: true, empty: false, errors: [] };
 
     const e = parseTime(r.entrada);
     const sa = parseTime(r.saidaAlmoco);
@@ -97,7 +97,7 @@
     const errors = [];
 
     if (e === null && sa === null && ra === null && sd === null) {
-      return { minutes: 0, complete: false, empty: true, errors };
+      return { minutes: 0, lunch: 0, complete: false, empty: true, errors };
     }
     if (e === null) errors.push('Informe a entrada.');
     if ((sa === null) !== (ra === null) && sd !== null) {
@@ -110,15 +110,16 @@
     if (sd !== null && lastBeforeExit !== null && sd <= lastBeforeExit) {
       errors.push('Saída deve ser depois dos horários anteriores.');
     }
-    if (errors.length) return { minutes: 0, complete: false, empty: false, errors };
+    if (errors.length) return { minutes: 0, lunch: 0, complete: false, empty: false, errors };
 
+    // Almoço registrado (saída e retorno): não conta como hora trabalhada.
+    const lunch = sa !== null && ra !== null ? ra - sa : 0;
     if (sd === null) {
       // Dia em andamento: contabiliza apenas o período da manhã, se já encerrado.
       const partial = sa !== null ? sa - e : 0;
-      return { minutes: partial, complete: false, empty: false, errors };
+      return { minutes: partial, lunch, complete: false, empty: false, errors };
     }
-    const lunch = sa !== null && ra !== null ? ra - sa : 0;
-    return { minutes: sd - e - lunch, complete: true, empty: false, errors };
+    return { minutes: sd - e - lunch, lunch, complete: true, empty: false, errors };
   }
 
   /**
@@ -154,6 +155,7 @@
     let daysDone = 0;
     let remainingWorkdays = 0;
     let invalidDays = 0;
+    let lunchTotal = 0;
     const perDay = [];
 
     for (let d = 1; d <= daysInMonth(year, month); d++) {
@@ -167,6 +169,7 @@
 
       if (ev.errors.length) invalidDays++;
       worked += ev.minutes;
+      lunchTotal += ev.lunch;
       if (ev.complete && tipo !== TIPOS.FOLGA) {
         dayBalance = ev.minutes - expected;
         balance += dayBalance;
@@ -193,6 +196,7 @@
       daysDone,
       remainingWorkdays,
       invalidDays,
+      lunchTotal,
       // média de horas por dia útil restante para fechar a meta (null se não há dias restantes)
       // (inclui o que já foi trabalhado hoje, para valer como total do dia em andamento)
       requiredPerDay: remainingWorkdays > 0 ? Math.ceil((missing + inProgress) / remainingWorkdays) : null,

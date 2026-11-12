@@ -7,7 +7,37 @@
   <title>Registro de Horas</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
-<body>
+<body class="locked">
+  <section id="auth" class="auth" hidden>
+    <form id="authForm" class="auth-card" autocomplete="off">
+      <h1>Registro de Horas</h1>
+      <h2 id="authTitle"></h2>
+      <p class="hint" id="authIntro"></p>
+      <label id="authCodigoWrap">Código de recuperação
+        <input id="authCodigo" type="text" autocomplete="off" spellcheck="false" placeholder="XXXXX-XXXXX-XXXXX-XXXXX">
+      </label>
+      <label><span id="authSenhaLabel">Senha</span>
+        <input id="authSenha" type="password" autocomplete="off" maxlength="256">
+      </label>
+      <label id="authConfirmaWrap">Confirmar senha
+        <input id="authConfirma" type="password" autocomplete="off" maxlength="256">
+      </label>
+      <p class="erro" id="authErro" role="alert"></p>
+      <div class="actions">
+        <button id="authEnviar" type="submit" class="primary"></button>
+        <button id="authAlternar" type="button"></button>
+      </div>
+    </form>
+    <div id="authCodigoPanel" class="auth-card" hidden>
+      <h2>Guarde seu código de recuperação</h2>
+      <p class="hint">Se você esquecer a senha, este código é a única forma de recuperar seus registros. Anote-o e guarde fora deste computador. Ele não será exibido novamente.</p>
+      <output id="codigoGerado" class="codigo"></output>
+      <div class="actions">
+        <button id="codigoContinuar" type="button" class="primary">Já anotei, continuar</button>
+      </div>
+    </div>
+  </section>
+
   <header class="topbar">
     <div class="brand">
       <h1>Registro de Horas</h1>
@@ -21,6 +51,7 @@
       <strong id="monthLabel" aria-live="polite"></strong>
       <button id="nextMonth" type="button" aria-label="Próximo mês">›</button>
       <button id="todayBtn" type="button">Hoje</button>
+      <button id="bloquearBtn" type="button" hidden>Bloquear</button>
     </nav>
   </header>
 
@@ -66,12 +97,30 @@
             <th>Saída almoço</th>
             <th>Retorno</th>
             <th>Saída</th>
+            <th>Almoço</th>
             <th>Total</th>
             <th>Saldo</th>
             <th>Observação</th>
           </tr>
         </thead>
         <tbody id="daysBody"></tbody>
+      </table>
+    </section>
+
+    <section class="table-wrap" id="empresasPanel" hidden>
+      <table>
+        <thead>
+          <tr>
+            <th>Empresa</th>
+            <th>Meta do mês</th>
+            <th>Trabalhado</th>
+            <th>Faltam</th>
+            <th>Saldo</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="empresasBody"></tbody>
+        <tfoot id="empresasFoot"></tfoot>
       </table>
     </section>
 
@@ -100,6 +149,7 @@
         <button id="exportJson" type="button">Exportar backup (JSON)</button>
         <button id="importJson" type="button">Importar backup</button>
         <button id="exportCsv" type="button">Exportar mês (CSV)</button>
+        <button id="trocarSenhaBtn" type="button" hidden>Alterar senha</button>
         <button id="excluirEmpresa" type="button" class="danger">Excluir esta empresa</button>
         <input id="importFile" type="file" accept="application/json,.json" hidden>
       </div>
@@ -120,11 +170,33 @@
       <label>Jornada diária (hh:mm)
         <input id="novaJornada" type="text" inputmode="numeric" value="08:00" required>
       </label>
-      <p class="hint" id="novaErro" role="alert"></p>
+      <p class="hint" id="novaLista"></p>
+      <p class="erro" id="novaErro" role="alert"></p>
       <div class="actions">
-        <button id="novaCriar" type="submit" class="primary">Criar empresa</button>
+        <button id="novaCriar" type="submit" class="primary">Salvar e concluir</button>
+        <button id="novaOutra" type="button">Salvar e adicionar outra</button>
         <button id="novaCancelar" type="button">Cancelar</button>
         <button id="novaImportar" type="button">Importar backup</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="senhaDialog">
+    <form id="senhaForm" method="dialog" autocomplete="off">
+      <h2>Alterar senha</h2>
+      <label>Senha atual
+        <input id="senhaAtual" type="password" autocomplete="off" maxlength="256">
+      </label>
+      <label>Nova senha (mínimo de 6 caracteres)
+        <input id="senhaNova" type="password" autocomplete="off" maxlength="256">
+      </label>
+      <label>Confirmar nova senha
+        <input id="senhaConfirma" type="password" autocomplete="off" maxlength="256">
+      </label>
+      <p class="erro" id="senhaErro" role="alert"></p>
+      <div class="actions">
+        <button id="senhaSalvar" type="submit" class="primary">Alterar senha</button>
+        <button id="senhaCancelar" type="button">Cancelar</button>
       </div>
     </form>
   </dialog>

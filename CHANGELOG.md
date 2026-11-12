@@ -3,6 +3,24 @@
 Todas as mudanças relevantes deste projeto são registradas aqui.
 O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o projeto adota [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+## [2.1.0] - 2026-11-12
+
+### Adicionado
+
+- Senha do aplicativo, configurada na primeira abertura e pedida a cada vez que ele abre.
+- Registros cifrados em disco (AES-256-GCM, com chave protegida por scrypt).
+- Código de recuperação exibido na criação da senha, para redefini-la em caso de esquecimento.
+- Botão "Bloquear" e opção "Alterar senha".
+- Cadastro de várias empresas em sequência ("Salvar e adicionar outra").
+- Visão geral das empresas no mês: meta, trabalhado, quanto falta, saldo e total.
+- Coluna com a duração do almoço em cada dia, total de almoço no mês e retorno previsto no painel "Hoje".
+
+### Alterado
+
+- Dados gravados sem senha pela versão 2.0.0 são cifrados ao criar a senha, e a cópia antiga sem cifra é removida.
+- O CSV exportado inclui a coluna de almoço.
+- Não é possível cadastrar duas empresas com o mesmo nome.
+
 ## [2.0.0] - 2026-11-12
 
 ### Adicionado

@@ -1,12 +1,22 @@
 'use strict';
 // Ponte mínima entre a interface (sem acesso ao Node) e o processo principal.
+// As chamadas assíncronas respondem { ok: true, ... } ou { ok: false, erro }.
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('horasDesktop', {
-  /** Conteúdo do arquivo de dados (texto JSON) ou null na primeira execução. */
-  carregar: () => ipcRenderer.sendSync('dados:carregar'),
-  /** Grava o estado completo (texto JSON). */
-  salvar: (json) => ipcRenderer.invoke('dados:salvar', json),
+  /** 'novo' (senha ainda não configurada) ou 'bloqueado'. */
+  estado: ipcRenderer.sendSync('cofre:estado'),
   /** Caminho do arquivo de dados neste computador. */
   caminho: ipcRenderer.sendSync('dados:caminho'),
+  /** Configura a senha inicial. Responde { codigo, dados } (dados de versão anterior, se houver). */
+  criar: (senha) => ipcRenderer.invoke('cofre:criar', senha),
+  /** Desbloqueia com a senha. Responde { dados }. */
+  abrir: (senha) => ipcRenderer.invoke('cofre:abrir', senha),
+  /** Desbloqueia com o código de recuperação e define uma nova senha. Responde { dados }. */
+  recuperar: (codigo, novaSenha) => ipcRenderer.invoke('cofre:recuperar', codigo, novaSenha),
+  trocarSenha: (atual, nova) => ipcRenderer.invoke('cofre:trocar-senha', atual, nova),
+  /** Grava o estado completo (texto JSON), cifrado. */
+  salvar: (json) => ipcRenderer.invoke('dados:salvar', json),
+  /** Descarta a chave da memória e volta à tela de senha. */
+  bloquear: () => ipcRenderer.invoke('cofre:bloquear'),
 });

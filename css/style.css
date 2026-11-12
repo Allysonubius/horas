@@ -151,7 +151,42 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.5); }
 dialog form { display: grid; gap: 12px; }
 dialog label { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: var(--muted); }
 dialog .actions { margin: 4px 0 0; }
-#novaErro { color: var(--bad); min-height: 1.2em; }
 tr.msg.info td { color: var(--muted); }
+
+.erro { color: var(--bad); font-size: 0.85rem; min-height: 1.2em; margin: 0; }
+
+/* Tela de senha */
+.locked .topbar, .locked main, .locked footer { display: none; }
+.auth { min-height: 100vh; display: grid; place-items: center; padding: 16px; }
+.auth-card {
+  width: min(400px, 100%);
+  display: grid;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 22px 24px;
+}
+.auth-card h1 { color: var(--muted); font-size: 0.9rem; font-weight: 500; }
+.auth-card h2 { font-size: 1.2rem; margin: 0; }
+.auth-card label { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: var(--muted); }
+.auth-card input { padding: 8px 10px; }
+.auth-card .actions { margin: 0; }
+.codigo {
+  display: block;
+  text-align: center;
+  font: 600 1.25rem ui-monospace, Consolas, monospace;
+  letter-spacing: 0.06em;
+  padding: 14px 8px;
+  background: var(--bg);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  user-select: all;
+}
+
+/* Visão geral das empresas */
+#empresasPanel tbody tr.ativa { background: var(--today); font-weight: 600; }
+#empresasPanel tfoot td { font-weight: 600; border-top: 1px solid var(--border); border-bottom: 0; }
+#empresasPanel td:last-child { text-align: right; }
 
 [hidden] { display: none !important; }
