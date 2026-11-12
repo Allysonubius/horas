@@ -133,3 +133,34 @@ test('almoço registrado é medido e não conta como trabalho', () => {
   }, S, '2026-11-04');
   assert.equal(sum.lunchTotal, 90);
 });
+
+test('Páscoa e feriados nacionais', () => {
+  assert.deepEqual(H.pascoa(2026), { month: 4, day: 5 });
+  assert.deepEqual(H.pascoa(2027), { month: 3, day: 28 });
+  assert.deepEqual(H.pascoa(2038), { month: 4, day: 25 });
+  const f = H.feriados(2026, false);
+  assert.equal(f['2026-04-03'], 'Sexta-feira Santa');
+  assert.equal(f['2026-11-20'], 'Dia da Consciência Negra');
+  assert.equal(f['2026-12-25'], 'Natal');
+  assert.equal(Object.keys(f).length, 10);
+  assert.equal(f['2026-02-17'], undefined);
+  const fac = H.feriados(2026, true);
+  assert.equal(fac['2026-02-16'], 'Carnaval');
+  assert.equal(fac['2026-02-17'], 'Carnaval');
+  assert.equal(fac['2026-06-04'], 'Corpus Christi');
+  assert.equal(H.feriados(2023, false)['2023-11-20'], undefined);
+});
+
+test('feriado em dia útil não conta como dia de trabalho', () => {
+  const comFeriados = { ...S, feriados: H.feriados(2026, false) };
+  // novembro/2026: 21 dias de segunda a sexta, menos Finados (seg, 02) e Consciência Negra (sex, 20)
+  const vazio = H.summarizeMonth(2026, 11, {}, comFeriados, '2026-11-01');
+  assert.equal(vazio.remainingWorkdays, 19);
+  assert.equal(vazio.projected, 152 * 60);
+  assert.equal(vazio.perDay[1].feriado, 'Finados');
+  assert.equal(H.summarizeMonth(2026, 11, {}, S, '2026-11-01').remainingWorkdays, 21);
+  // trabalhar no feriado gera saldo integral, como em fim de semana
+  const sum = H.summarizeMonth(2026, 11, { '2026-11-02': full('08:00', '12:00', '13:00', '15:00') }, comFeriados, '2026-11-03');
+  assert.equal(sum.balance, 360);
+  assert.equal(sum.remainingWorkdays, 19); // o feriado nunca entrou na conta de dias úteis
+});

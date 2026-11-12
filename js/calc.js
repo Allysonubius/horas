@@ -10,7 +10,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  const VERSION = '2.1.0';
+  const VERSION = '2.2.0';
 
   const DEFAULT_SETTINGS = Object.freeze({
     metaMensal: 152 * 60, // 152:00
@@ -75,6 +75,56 @@
   function isWeekend(year, month, day) {
     const w = weekday(year, month, day);
     return w === 0 || w === 6;
+  }
+
+  /** Domingo de Páscoa (algoritmo de Meeus/Jones/Butcher, calendário gregoriano). */
+  function pascoa(year) {
+    const a = year % 19;
+    const b = Math.floor(year / 100);
+    const c = year % 100;
+    const d = Math.floor(b / 4);
+    const e = b % 4;
+    const f = Math.floor((b + 8) / 25);
+    const g = Math.floor((b - f + 1) / 3);
+    const h = (19 * a + b - d - g + 15) % 30;
+    const i = Math.floor(c / 4);
+    const k = c % 4;
+    const l = (32 + 2 * e + 2 * i - h - k) % 7;
+    const m = Math.floor((a + 11 * h + 22 * l) / 451);
+    const month = Math.floor((h + l - 7 * m + 114) / 31);
+    const day = ((h + l - 7 * m + 114) % 31) + 1;
+    return { month, day };
+  }
+
+  /**
+   * Feriados nacionais do Brasil em um ano: { 'AAAA-MM-DD': nome }.
+   * Com `incluirFacultativos`, inclui também Carnaval e Corpus Christi (pontos facultativos).
+   * Feriados estaduais e municipais não são cobertos.
+   */
+  function feriados(year, incluirFacultativos) {
+    const mapa = {};
+    const fixo = (month, day, nome) => { mapa[isoDate(year, month, day)] = nome; };
+    const p = pascoa(year);
+    const movel = (offset, nome) => {
+      const d = new Date(year, p.month - 1, p.day + offset);
+      mapa[isoDate(d.getFullYear(), d.getMonth() + 1, d.getDate())] = nome;
+    };
+    fixo(1, 1, 'Confraternização Universal');
+    fixo(4, 21, 'Tiradentes');
+    fixo(5, 1, 'Dia do Trabalho');
+    fixo(9, 7, 'Independência do Brasil');
+    fixo(10, 12, 'Nossa Senhora Aparecida');
+    fixo(11, 2, 'Finados');
+    fixo(11, 15, 'Proclamação da República');
+    if (year >= 2024) fixo(11, 20, 'Dia da Consciência Negra');
+    fixo(12, 25, 'Natal');
+    movel(-2, 'Sexta-feira Santa');
+    if (incluirFacultativos) {
+      movel(-48, 'Carnaval');
+      movel(-47, 'Carnaval');
+      movel(60, 'Corpus Christi');
+    }
+    return mapa;
   }
 
   /**
@@ -146,6 +196,8 @@
    * Resumo do mês.
    * days: mapa { 'AAAA-MM-DD': registro }
    * todayISO: data de hoje, usada para contar os dias úteis restantes.
+   * settings.feriados (opcional): mapa { 'AAAA-MM-DD': nome }. Feriado conta como dia sem jornada,
+   * igual a um fim de semana: não entra nos dias úteis e o que for trabalhado vira saldo.
    */
   function summarizeMonth(year, month, days, settings, todayISO) {
     const s = settings || DEFAULT_SETTINGS;
@@ -163,8 +215,10 @@
       const rec = map[iso] || {};
       const tipo = rec.tipo || TIPOS.TRABALHO;
       const weekend = isWeekend(year, month, d);
+      const feriado = (s.feriados && s.feriados[iso]) || null;
+      const livre = weekend || !!feriado; // dia sem jornada prevista
       const ev = evaluateDay(rec, s);
-      const expected = weekend || tipo === TIPOS.FOLGA ? 0 : s.jornadaDiaria;
+      const expected = livre || tipo === TIPOS.FOLGA ? 0 : s.jornadaDiaria;
       let dayBalance = null;
 
       if (ev.errors.length) invalidDays++;
@@ -175,16 +229,16 @@
         balance += dayBalance;
         daysDone++;
       }
-      const pending = !ev.complete && !weekend && tipo === TIPOS.TRABALHO;
+      const pending = !ev.complete && !livre && tipo === TIPOS.TRABALHO;
       if (pending && (!todayISO || iso >= todayISO)) remainingWorkdays++;
 
-      perDay.push({ iso, day: d, weekend, tipo, expected, balance: dayBalance, ...ev });
+      perDay.push({ iso, day: d, weekend, feriado, livre, tipo, expected, balance: dayBalance, ...ev });
     }
 
     const missing = Math.max(s.metaMensal - worked, 0);
     const projected = worked + remainingWorkdays * s.jornadaDiaria;
     // Horas da jornada do dia em andamento já contadas em `worked` não entram duas vezes na projeção.
-    const inProgress = perDay.filter((p) => !p.complete && !p.empty && !p.weekend && p.tipo === TIPOS.TRABALHO
+    const inProgress = perDay.filter((p) => !p.complete && !p.empty && !p.livre && p.tipo === TIPOS.TRABALHO
       && (!todayISO || p.iso >= todayISO)).reduce((acc, p) => acc + p.minutes, 0);
 
     return {
@@ -233,6 +287,8 @@
     daysInMonth,
     weekday,
     isWeekend,
+    pascoa,
+    feriados,
     evaluateDay,
     exitTimeFor,
     summarizeMonth,

@@ -3,6 +3,19 @@
 Todas as mudanças relevantes deste projeto são registradas aqui.
 O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o projeto adota [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+## [2.2.0] - 2026-11-12
+
+### Adicionado
+
+- Atualização automática: ao abrir, o aplicativo consulta a release mais recente no GitHub, baixa em segundo plano e instala ao fechar. Não é mais preciso baixar o instalador a cada versão.
+- Feriados nacionais identificados automaticamente, inclusive a Sexta-feira Santa. Feriados não contam como dia útil na meta.
+- Opção por empresa para incluir os pontos facultativos (Carnaval e Corpus Christi) ou desativar os feriados automáticos.
+- Legenda e etiqueta com o nome do feriado na tabela de dias.
+
+### Alterado
+
+- Fins de semana, feriados e o dia de hoje têm cores mais destacadas.
+
 ## [2.1.0] - 2026-11-12
 
 ### Adicionado

@@ -1,9 +1,13 @@
 {
   "name": "horas",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Registro de horas mensais por empresa, com meta, saldo e sugestão de horário de saída",
   "license": "MIT",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Allysonubius/horas.git"
+  },
   "main": "electron/main.js",
   "scripts": {
     "start": "electron .",
@@ -14,6 +18,9 @@
   },
   "engines": {
     "node": ">=22"
+  },
+  "dependencies": {
+    "electron-updater": "6.8.11"
   },
   "devDependencies": {
     "electron": "45.3.1",
@@ -38,7 +45,9 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "build/icon.png"
@@ -51,6 +60,13 @@
       "createStartMenuShortcut": true,
       "shortcutName": "Registro de Horas",
       "deleteAppDataOnUninstall": false
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Allysonubius",
+        "repo": "horas"
+      }
+    ]
   }
 }

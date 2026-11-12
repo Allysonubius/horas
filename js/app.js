@@ -90,6 +90,7 @@
     const { year, month } = view;
     const today = todayISO();
     const dias = empresa().dias;
+    const feriados = config().feriados;
 
     for (let d = 1; d <= H.daysInMonth(year, month); d++) {
       const iso = H.isoDate(year, month, d);
@@ -99,7 +100,12 @@
       if (iso === today) tr.classList.add('is-today');
 
       const label = String(d).padStart(2, '0') + ' ' + WEEKDAYS[H.weekday(year, month, d)];
-      tr.append(el('td', { className: 'num', textContent: label }));
+      const dia = el('td', { className: 'num', textContent: label });
+      if (feriados[iso]) {
+        tr.classList.add('holiday');
+        dia.append(el('span', { className: 'tag', textContent: feriados[iso] }));
+      }
+      tr.append(dia);
 
       const select = el('select', { ariaLabel: 'Tipo do dia ' + d });
       for (const [value, text] of TIPO_LABELS) select.append(el('option', { value, textContent: text }));
@@ -228,6 +234,9 @@
     const line = (...parts) => items.push(el('li', null, parts));
     const bold = (text) => el('b', { textContent: text });
 
+    if (p.feriado) {
+      line('Hoje é feriado: ', bold(p.feriado), '. Não há jornada prevista; o que for trabalhado conta como saldo.');
+    }
     if (p.tipo !== H.TIPOS.TRABALHO) {
       line('Dia marcado como ', bold(p.tipo === H.TIPOS.FOLGA ? 'feriado/folga' : 'abono/atestado'), '.');
     } else if (p.errors.length) {
@@ -356,6 +365,9 @@
     const especifica = e.metas[M.chaveMes(view.year, view.month)];
     $('cfgMetaMes').value = especifica === undefined ? '' : H.formatDuration(especifica);
     $('cfgMetaMesLabel').textContent = 'Meta só de ' + monthName().toLowerCase() + ' (hh:mm)';
+    $('cfgFeriados').checked = e.feriadosNacionais;
+    $('cfgFacultativos').checked = e.pontosFacultativos;
+    $('cfgFacultativos').disabled = !e.feriadosNacionais;
     $('cfgError').textContent = '';
   }
 
@@ -403,6 +415,14 @@
       fillSettings();
       refresh();
     });
+
+    for (const [id, key] of [['cfgFeriados', 'feriadosNacionais'], ['cfgFacultativos', 'pontosFacultativos']]) {
+      $(id).addEventListener('change', () => {
+        empresa()[key] = $(id).checked;
+        save();
+        render();
+      });
+    }
 
     $('excluirEmpresa').addEventListener('click', () => {
       const e = empresa();
@@ -672,6 +692,33 @@
     });
   }
 
+  // ---------- Atualização automática (aplicativo instalado) ----------
+
+  function mostrarAtualizacao(a) {
+    const info = a || {};
+    const textos = {
+      verificando: 'Verificando atualizações…',
+      atualizado: 'Você está na versão mais recente.',
+      baixando: 'Baixando a versão ' + info.versao + (info.progresso ? ' (' + info.progresso + '%)' : '') + '…',
+      pronta: 'Versão ' + info.versao + ' pronta para instalar.',
+      erro: 'Não foi possível verificar atualizações.',
+    };
+    $('updateStatus').textContent = textos[info.estado] || '';
+    $('updateBar').hidden = info.estado !== 'pronta';
+    if (info.estado === 'pronta') {
+      $('updateText').textContent = 'A versão ' + info.versao + ' foi baixada e será instalada ao fechar o aplicativo.';
+    }
+  }
+
+  function bindAtualizacao() {
+    desktop.aoAtualizar(mostrarAtualizacao);
+    desktop.atualizacao().then(mostrarAtualizacao, () => {});
+    $('updateBtn').addEventListener('click', () => {
+      $('updateBtn').disabled = true;
+      desktop.instalarAtualizacao();
+    });
+  }
+
   // ---------- Inicialização ----------
 
   $('prevMonth').addEventListener('click', () => shiftMonth(-1));
@@ -701,6 +748,7 @@
   bindSettings();
   bindEmpresaDialog();
   if (desktop) {
+    bindAtualizacao();
     bindSenha();
     $('auth').hidden = false;
     setAuthModo(desktop.estado === 'novo' ? 'criar' : 'entrar');

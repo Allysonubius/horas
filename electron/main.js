@@ -22,6 +22,8 @@ let chave = null; // chave de dados; null = bloqueado
 let legado = null; // dados sem senha gravados por versões anteriores, aguardando a criação da senha
 let falhas = 0;
 let fila = Promise.resolve();
+let atualizacao = { estado: 'inativo' };
+let atualizador = null;
 
 /** Lê o arquivo de dados (ou a cópia de segurança, se o principal estiver corrompido). */
 function carregarArquivo() {
@@ -153,6 +155,15 @@ function registrarIpc() {
     return {};
   });
 
+  responder('atualizacao:atual', async () => atualizacao);
+  responder('atualizacao:instalar', async () => {
+    if (!atualizador || atualizacao.estado !== 'pronta') throw new Error('Nenhuma atualização pronta.');
+    await fila.catch(() => {});
+    chave = null;
+    setImmediate(() => atualizador.quitAndInstall(true, true));
+    return {};
+  });
+
   responder('cofre:bloquear', async () => {
     await fila.catch(() => {});
     chave = null;
@@ -160,6 +171,42 @@ function registrarIpc() {
     if (win) win.webContents.reload();
     return {};
   });
+}
+
+/**
+ * Atualização automática: ao abrir, consulta a release mais recente do repositório no GitHub,
+ * baixa em segundo plano e instala ao fechar o aplicativo (ou quando a pessoa pedir).
+ * Só funciona no aplicativo instalado. Sem internet, a verificação falha em silêncio.
+ */
+function avisarAtualizacao(info) {
+  atualizacao = info;
+  for (const win of BrowserWindow.getAllWindows()) win.webContents.send('atualizacao:estado', info);
+}
+
+function iniciarAtualizacao() {
+  if (!app.isPackaged || process.env.HORAS_SEM_ATUALIZACAO) return;
+  try {
+    atualizador = require('electron-updater').autoUpdater;
+  } catch (err) {
+    console.error('Atualizador indisponível: ' + err.message);
+    return;
+  }
+  atualizador.autoDownload = true;
+  atualizador.autoInstallOnAppQuit = true;
+  atualizador.allowPrerelease = false;
+  atualizador.allowDowngrade = false;
+  atualizador.on('checking-for-update', () => avisarAtualizacao({ estado: 'verificando' }));
+  atualizador.on('update-not-available', () => avisarAtualizacao({ estado: 'atualizado' }));
+  atualizador.on('update-available', (info) => avisarAtualizacao({ estado: 'baixando', versao: info.version }));
+  atualizador.on('download-progress', (p) => {
+    avisarAtualizacao({ estado: 'baixando', versao: atualizacao.versao, progresso: Math.round(p.percent) });
+  });
+  atualizador.on('update-downloaded', (info) => avisarAtualizacao({ estado: 'pronta', versao: info.version }));
+  atualizador.on('error', (err) => {
+    console.error('Atualização: ' + (err && err.message));
+    if (atualizacao.estado !== 'pronta') avisarAtualizacao({ estado: 'erro' });
+  });
+  atualizador.checkForUpdates().catch(() => {});
 }
 
 function criarJanela() {
@@ -207,6 +254,7 @@ if (!app.requestSingleInstanceLock()) {
   app.whenReady().then(() => {
     Menu.setApplicationMenu(null);
     criarJanela();
+    iniciarAtualizacao();
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) criarJanela();
     });

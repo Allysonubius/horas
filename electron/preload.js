@@ -19,4 +19,11 @@ contextBridge.exposeInMainWorld('horasDesktop', {
   salvar: (json) => ipcRenderer.invoke('dados:salvar', json),
   /** Descarta a chave da memória e volta à tela de senha. */
   bloquear: () => ipcRenderer.invoke('cofre:bloquear'),
+  /** Situação da atualização automática: { estado, versao, progresso }. */
+  atualizacao: () => ipcRenderer.invoke('atualizacao:atual'),
+  aoAtualizar: (callback) => {
+    ipcRenderer.on('atualizacao:estado', (_event, info) => callback(info));
+  },
+  /** Fecha o aplicativo e instala a versão já baixada. */
+  instalarAtualizacao: () => ipcRenderer.invoke('atualizacao:instalar'),
 });

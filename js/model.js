@@ -9,6 +9,7 @@
  *   empresas: [{
  *     id, nome,
  *     metaMensal, jornadaDiaria, almocoPadrao,   // minutos
+ *     feriadosNacionais, pontosFacultativos,     // feriados automáticos (booleanos)
  *     metas: { 'AAAA-MM': minutos },             // meta específica de um mês (ex.: mês de entrada ou saída)
  *     dias: { 'AAAA-MM-DD': { entrada, saidaAlmoco, retornoAlmoco, saida, tipo, obs } }
  *   }]
@@ -63,6 +64,8 @@
     const empresa = {
       id: typeof d.id === 'string' && /^[\w-]{1,40}$/.test(d.id) ? d.id : novoId(),
       nome: limparNome(d.nome) || 'Empresa',
+      feriadosNacionais: d.feriadosNacionais !== false,
+      pontosFacultativos: d.pontosFacultativos === true,
       metas: limparMetas(d.metas),
       dias: limparDias(d.dias),
     };
@@ -119,6 +122,7 @@
       metaMensal: especifica !== undefined ? especifica : empresa.metaMensal,
       jornadaDiaria: empresa.jornadaDiaria,
       almocoPadrao: empresa.almocoPadrao,
+      feriados: empresa.feriadosNacionais ? H.feriados(year, empresa.pontosFacultativos) : {},
     };
   }
 

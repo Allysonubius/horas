@@ -2,7 +2,7 @@
 
 Aplicativo desktop para registrar as horas trabalhadas, acompanhar a meta mensal de cada empresa e saber, enquanto o dia é preenchido, a que horas é possível sair mais cedo ou é preciso sair mais tarde.
 
-- Funciona offline: não há servidor, conta ou envio de dados.
+- Funciona offline: não há servidor, conta ou envio de dados. A única conexão é a consulta de novas versões no GitHub ao abrir.
 - Os registros ficam somente no computador de quem usa, cifrados com uma senha definida na primeira abertura.
 - Várias empresas, cada uma com sua meta e jornada — útil ao trocar de trabalho ou ter mais de um.
 
@@ -13,6 +13,10 @@ Aplicativo desktop para registrar as horas trabalhadas, acompanhar a meta mensal
 3. Abra o **Registro de Horas** pelo menu Iniciar ou pelo atalho da área de trabalho.
 
 O instalador não é assinado digitalmente, então o Windows SmartScreen pode exibir um aviso: escolha "Mais informações" e "Executar assim mesmo".
+
+### Atualizações
+
+A instalação manual só é necessária uma vez. A cada abertura, o aplicativo consulta a release mais recente deste repositório, baixa a nova versão em segundo plano e a instala ao ser fechado. Um aviso com o botão "Reiniciar e atualizar" permite aplicar na hora. Sem internet, a verificação é ignorada e o aplicativo abre normalmente.
 
 Na primeira abertura:
 
@@ -30,6 +34,8 @@ Na primeira abertura:
 - **Almoço**: a duração registrada aparece em cada dia e somada no mês, e não conta como hora trabalhada. Durante o almoço, o painel "Hoje" mostra o retorno previsto.
 - **Resumo do mês**: trabalhado, quanto falta para a meta, saldo (banco) frente à jornada diária e projeção de fechamento.
 - **Painel "Hoje"**: com a entrada preenchida, mostra a saída para cumprir a jornada e a saída ajustada pelo saldo acumulado — mais cedo se o saldo é positivo, mais tarde se é negativo. Enquanto o retorno do almoço não é informado, considera o almoço padrão.
+- **Feriados**: os feriados nacionais do Brasil são identificados automaticamente, inclusive os móveis (Sexta-feira Santa), e não contam como dia útil na meta. Carnaval e Corpus Christi (pontos facultativos) podem ser incluídos por empresa.
+- **Calendário destacado**: fins de semana, feriados e o dia de hoje aparecem em cores diferentes.
 - **Média necessária**: horas por dia útil restante para fechar a meta.
 - **Validação**: aponta horários fora de ordem ou incompletos em cada dia.
 - **Tipos de dia**: trabalho, feriado/folga (não conta) e abono/atestado (credita a jornada diária).
@@ -59,10 +65,10 @@ Este repositório contém apenas código: nenhum registro de horas faz parte del
 | Total do dia | `(saída − entrada) − almoço` |
 | Saldo do dia | total − jornada diária (em fins de semana e feriados, tudo conta como extra) |
 | Faltam | meta do mês − trabalhado |
-| Dias úteis restantes | dias de segunda a sexta, de hoje em diante, ainda não concluídos e não marcados como folga/abono |
+| Dias úteis restantes | dias de segunda a sexta que não são feriado, de hoje em diante, ainda não concluídos e não marcados como folga/abono |
 | Projeção | trabalhado + dias úteis restantes × jornada diária |
 
-Feriados não são detectados automaticamente: marque o dia como **Feriado/Folga**. Jornadas que atravessam a meia-noite não são suportadas.
+Feriados estaduais e municipais não são detectados: marque o dia como **Feriado/Folga**. Se a empresa não segue os feriados nacionais, desmarque a opção em "Empresa e metas". Jornadas que atravessam a meia-noite não são suportadas.
 
 ## Desenvolvimento
 
@@ -108,7 +114,7 @@ git tag vX.Y.Z
 git push origin main --tags
 ```
 
-O workflow [release.yml](.github/workflows/release.yml) executa os testes, confere a versão, gera o instalador e publica a release com as notas do changelog.
+O workflow [release.yml](.github/workflows/release.yml) executa os testes, confere a versão, gera o instalador e publica a release com as notas do changelog. Os arquivos `latest.yml` e `.blockmap` anexados à release são o que os aplicativos instalados consultam para se atualizar, então não os remova.
 
 ## Licença
 

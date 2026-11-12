@@ -88,6 +88,11 @@
     </section>
 
     <section class="table-wrap">
+      <p class="legend">
+        <span class="swatch sw-weekend"></span> Fim de semana
+        <span class="swatch sw-holiday"></span> Feriado
+        <span class="swatch sw-today"></span> Hoje
+      </p>
       <table id="daysTable">
         <thead>
           <tr>
@@ -143,6 +148,11 @@
           <input id="cfgMetaMes" type="text" inputmode="numeric" placeholder="usa a meta padrão">
         </label>
       </div>
+      <div class="checks">
+        <label class="check"><input id="cfgFeriados" type="checkbox"> Considerar feriados nacionais automaticamente</label>
+        <label class="check"><input id="cfgFacultativos" type="checkbox"> Incluir pontos facultativos (Carnaval e Corpus Christi)</label>
+      </div>
+      <p class="hint">Feriados não contam como dia útil na meta. Feriados estaduais e municipais não são detectados: marque o dia como "Feriado/Folga".</p>
       <p class="hint">Use "Meta só deste mês" quando o mês for parcial, por exemplo ao entrar ou sair da empresa. Deixe em branco para usar a meta padrão.</p>
       <p class="hint" id="cfgError" role="alert"></p>
       <div class="actions">
@@ -201,8 +211,14 @@
     </form>
   </dialog>
 
+  <div id="updateBar" class="update-bar" role="status" hidden>
+    <span id="updateText"></span>
+    <button id="updateBtn" type="button" class="primary">Reiniciar e atualizar</button>
+  </div>
+
   <footer>
     <span id="version"></span>
+    <span id="updateStatus"></span>
   </footer>
 
   <script src="js/calc.js"></script>

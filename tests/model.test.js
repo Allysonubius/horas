@@ -58,3 +58,14 @@ test('meta específica do mês substitui a meta padrão', () => {
   assert.equal(M.configDoMes(e, 2026, 12).metaMensal, 9120);
   assert.equal(M.configDoMes(e, 2026, 11).jornadaDiaria, 480);
 });
+
+test('feriados automáticos por empresa', () => {
+  const padrao = M.novaEmpresa({ nome: 'A' });
+  assert.deepEqual([padrao.feriadosNacionais, padrao.pontosFacultativos], [true, false]);
+  assert.equal(M.configDoMes(padrao, 2026, 11).feriados['2026-11-02'], 'Finados');
+  assert.equal(M.configDoMes(padrao, 2026, 2).feriados['2026-02-17'], undefined);
+  const facultativos = M.novaEmpresa({ nome: 'B', pontosFacultativos: true });
+  assert.equal(M.configDoMes(facultativos, 2026, 2).feriados['2026-02-17'], 'Carnaval');
+  const semFeriados = M.novaEmpresa({ nome: 'C', feriadosNacionais: false, pontosFacultativos: true });
+  assert.deepEqual(M.configDoMes(semFeriados, 2026, 11).feriados, {});
+});
