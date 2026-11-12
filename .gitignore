@@ -1,5 +1,9 @@
 node_modules/
+dist/
 .claude/
 *.zip
+# Dados pessoais nunca entram no repositório
+dados.json
+dados.json.*
 horas-backup-*.json
 horas-*.csv

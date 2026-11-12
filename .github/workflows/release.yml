@@ -1,6 +1,7 @@
 name: Release
 
-# Publica uma release ao enviar uma tag vX.Y.Z.
+# Publica uma release ao enviar uma tag vX.Y.Z:
+# roda os testes, gera o instalador do Windows e anexa à release.
 # As notas vêm da seção correspondente do CHANGELOG.md.
 on:
   push:
@@ -11,16 +12,17 @@ permissions:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-
-      - name: Testes
-        run: npm test
+          cache: npm
 
       - name: Validar versão da tag
         run: |
@@ -43,12 +45,18 @@ jobs:
             exit 1
           fi
 
-      - name: Empacotar
-        run: zip -r "horas-$GITHUB_REF_NAME.zip" index.html css js scripts package.json README.md CHANGELOG.md
+      - name: Instalar dependências
+        run: npm ci --no-fund --no-audit
+
+      - name: Testes
+        run: npm test
+
+      - name: Gerar instalador
+        run: npm run dist
 
       - name: Criar release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" "horas-$GITHUB_REF_NAME.zip" \
+          gh release create "$GITHUB_REF_NAME" "dist/Registro-de-Horas-Setup-$VERSION.exe" \
             --title "$GITHUB_REF_NAME" --notes-file notes.md --verify-tag

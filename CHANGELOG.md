@@ -3,6 +3,23 @@
 Todas as mudanças relevantes deste projeto são registradas aqui.
 O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o projeto adota [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+## [2.0.0] - 2026-11-12
+
+### Adicionado
+
+- Aplicativo desktop para Windows com instalador, atalhos no menu Iniciar e na área de trabalho.
+- Várias empresas, cada uma com meta mensal, jornada diária, almoço padrão e registros próprios.
+- Cadastro inicial da empresa e das horas a cumprir por mês na primeira abertura.
+- Meta específica para um mês (mês de entrada ou saída da empresa, por exemplo).
+- Gravação dos registros em arquivo local do usuário, com escrita atômica e cópia de segurança da versão anterior.
+- Licença MIT.
+
+### Alterado
+
+- O backup em JSON passa a incluir todas as empresas. Backups da versão 1 continuam sendo aceitos na importação.
+- A release publica o instalador do Windows no lugar do pacote `.zip`.
+- `npm start` abre o aplicativo desktop; a versão para navegador passa a ser `npm run web`.
+
 ## [1.0.0] - 2026-11-12
 
 ### Adicionado

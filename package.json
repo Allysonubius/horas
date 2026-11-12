@@ -1,13 +1,56 @@
 {
   "name": "horas",
-  "version": "1.0.0",
-  "description": "Registro de horas mensais com meta, saldo e sugestão de horário de saída",
+  "version": "2.0.0",
+  "description": "Registro de horas mensais por empresa, com meta, saldo e sugestão de horário de saída",
+  "license": "MIT",
   "private": true,
+  "main": "electron/main.js",
   "scripts": {
-    "start": "node scripts/serve.js",
-    "test": "node --test"
+    "start": "electron .",
+    "web": "node scripts/serve.js",
+    "test": "node --test",
+    "icon": "node scripts/make-icon.js",
+    "dist": "electron-builder --win --publish never"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "electron": "45.3.1",
+    "electron-builder": "26.18.0"
+  },
+  "build": {
+    "appId": "io.github.horas.registro",
+    "productName": "Registro de Horas",
+    "artifactName": "Registro-de-Horas-Setup-${version}.${ext}",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "index.html",
+      "css/**",
+      "js/**",
+      "electron/**",
+      "build/icon.png",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Registro de Horas",
+      "deleteAppDataOnUninstall": false
+    }
   }
 }
