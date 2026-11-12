@@ -1,6 +1,6 @@
 {
   "name": "horas",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "Registro de horas mensais por empresa, com meta, saldo e sugestão de horário de saída",
   "license": "MIT",
   "private": true,

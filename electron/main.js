@@ -4,7 +4,7 @@
  * Os registros ficam cifrados em <dados do usuário>/dados.json, fora da pasta do programa e do
  * repositório. A chave só existe em memória enquanto o aplicativo está desbloqueado.
  */
-const { app, BrowserWindow, Menu, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, Menu, Tray, ipcMain, nativeImage, shell } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 const cofre = require('./cofre.js');
@@ -24,6 +24,7 @@ let falhas = 0;
 let fila = Promise.resolve();
 let atualizacao = { estado: 'inativo' };
 let atualizador = null;
+let bandeja = null;
 
 /** Lê o arquivo de dados (ou a cópia de segurança, se o principal estiver corrompido). */
 function carregarArquivo() {
@@ -165,10 +166,7 @@ function registrarIpc() {
   });
 
   responder('cofre:bloquear', async () => {
-    await fila.catch(() => {});
-    chave = null;
-    const [win] = BrowserWindow.getAllWindows();
-    if (win) win.webContents.reload();
+    await bloquear();
     return {};
   });
 }
@@ -209,6 +207,40 @@ function iniciarAtualizacao() {
   atualizador.checkForUpdates().catch(() => {});
 }
 
+/** Descarta a chave da memória e volta à tela de senha. */
+async function bloquear() {
+  await fila.catch(() => {});
+  chave = null;
+  const [win] = BrowserWindow.getAllWindows();
+  if (win) win.webContents.reload();
+}
+
+/** Traz a janela de volta, esteja ela minimizada ou recolhida na bandeja. */
+function mostrarJanela() {
+  const [win] = BrowserWindow.getAllWindows();
+  if (!win) return;
+  if (win.isMinimized()) win.restore();
+  win.show();
+  win.focus();
+}
+
+/**
+ * Ícone na bandeja do sistema (ao lado do relógio). Ao minimizar, a janela sai da barra de
+ * tarefas e fica só na bandeja; um clique no ícone a traz de volta.
+ */
+function criarBandeja() {
+  const icone = nativeImage.createFromPath(path.join(ROOT, 'build', 'icon.png')).resize({ width: 32, height: 32 });
+  bandeja = new Tray(icone);
+  bandeja.setToolTip('Registro de Horas');
+  bandeja.setContextMenu(Menu.buildFromTemplate([
+    { label: 'Abrir', click: mostrarJanela },
+    { label: 'Bloquear', click: () => bloquear() },
+    { type: 'separator' },
+    { label: 'Sair', click: () => app.quit() },
+  ]));
+  bandeja.on('click', mostrarJanela);
+}
+
 function criarJanela() {
   const win = new BrowserWindow({
     width: 1180,
@@ -234,6 +266,9 @@ function criarJanela() {
   });
   win.webContents.on('will-navigate', (event) => event.preventDefault());
   win.once('ready-to-show', () => win.show());
+  win.on('minimize', () => {
+    if (bandeja) win.hide();
+  });
   win.loadFile(path.join(ROOT, 'index.html'));
   return win;
 }
@@ -241,19 +276,14 @@ function criarJanela() {
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
-  app.on('second-instance', () => {
-    const [win] = BrowserWindow.getAllWindows();
-    if (win) {
-      if (win.isMinimized()) win.restore();
-      win.focus();
-    }
-  });
+  app.on('second-instance', mostrarJanela);
 
   registrarIpc();
 
   app.whenReady().then(() => {
     Menu.setApplicationMenu(null);
     criarJanela();
+    criarBandeja();
     iniciarAtualizacao();
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) criarJanela();

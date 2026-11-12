@@ -35,6 +35,7 @@ Na primeira abertura:
 - **Resumo do mês**: trabalhado, quanto falta para a meta, saldo (banco) frente à jornada diária e projeção de fechamento.
 - **Painel "Hoje"**: com a entrada preenchida, mostra a saída para cumprir a jornada e a saída ajustada pelo saldo acumulado — mais cedo se o saldo é positivo, mais tarde se é negativo. Enquanto o retorno do almoço não é informado, considera o almoço padrão.
 - **Feriados**: os feriados nacionais do Brasil são identificados automaticamente, inclusive os móveis (Sexta-feira Santa), e não contam como dia útil na meta. Carnaval e Corpus Christi (pontos facultativos) podem ser incluídos por empresa.
+- **Bandeja do sistema**: ao minimizar, o aplicativo fica no ícone ao lado do relógio, sem ocupar a barra de tarefas. Um clique reabre a janela; o botão direito oferece Abrir, Bloquear e Sair. Fechar a janela (X) encerra o aplicativo.
 - **Calendário destacado**: fins de semana, feriados e o dia de hoje aparecem em cores diferentes.
 - **Média necessária**: horas por dia útil restante para fechar a meta.
 - **Validação**: aponta horários fora de ordem ou incompletos em cada dia.

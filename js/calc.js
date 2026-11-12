@@ -10,7 +10,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  const VERSION = '2.2.0';
+  const VERSION = '2.3.0';
 
   const DEFAULT_SETTINGS = Object.freeze({
     metaMensal: 152 * 60, // 152:00

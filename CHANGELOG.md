@@ -3,6 +3,13 @@
 Todas as mudanças relevantes deste projeto são registradas aqui.
 O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o projeto adota [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+## [2.3.0] - 2026-11-12
+
+### Adicionado
+
+- Ícone na bandeja do sistema (ao lado do relógio). Ao minimizar, o aplicativo sai da barra de tarefas e continua aberto na bandeja; um clique no ícone traz a janela de volta.
+- Menu do ícone com as opções Abrir, Bloquear e Sair.
+
 ## [2.2.0] - 2026-11-12
 
 ### Adicionado
