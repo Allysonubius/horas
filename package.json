@@ -1,0 +1,13 @@
+{
+  "name": "horas",
+  "version": "1.0.0",
+  "description": "Registro de horas mensais com meta, saldo e sugestão de horário de saída",
+  "private": true,
+  "scripts": {
+    "start": "node scripts/serve.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

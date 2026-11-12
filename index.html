@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Registro de Horas</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>Registro de Horas</h1>
+    <nav class="month-nav" aria-label="Navegação de mês">
+      <button id="prevMonth" type="button" aria-label="Mês anterior">‹</button>
+      <strong id="monthLabel" aria-live="polite"></strong>
+      <button id="nextMonth" type="button" aria-label="Próximo mês">›</button>
+      <button id="todayBtn" type="button">Hoje</button>
+    </nav>
+  </header>
+
+  <main>
+    <section class="cards" aria-label="Resumo do mês">
+      <div class="card">
+        <span class="label">Trabalhado</span>
+        <span class="value" id="sumWorked">00:00</span>
+        <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" id="progress">
+          <div id="progressBar"></div>
+        </div>
+        <span class="hint" id="sumGoal"></span>
+      </div>
+      <div class="card">
+        <span class="label">Faltam para a meta</span>
+        <span class="value" id="sumMissing">00:00</span>
+        <span class="hint" id="sumRemaining"></span>
+      </div>
+      <div class="card">
+        <span class="label">Saldo (banco) do mês</span>
+        <span class="value" id="sumBalance">00:00</span>
+        <span class="hint" id="sumBalanceHint"></span>
+      </div>
+      <div class="card">
+        <span class="label">Projeção de fechamento</span>
+        <span class="value" id="sumProjected">00:00</span>
+        <span class="hint" id="sumProjectedHint"></span>
+      </div>
+    </section>
+
+    <section class="today" id="todayPanel" hidden aria-live="polite">
+      <h2>Hoje</h2>
+      <div id="todayBody"></div>
+    </section>
+
+    <section class="table-wrap">
+      <table id="daysTable">
+        <thead>
+          <tr>
+            <th>Dia</th>
+            <th>Tipo</th>
+            <th>Entrada</th>
+            <th>Saída almoço</th>
+            <th>Retorno</th>
+            <th>Saída</th>
+            <th>Total</th>
+            <th>Saldo</th>
+            <th>Observação</th>
+          </tr>
+        </thead>
+        <tbody id="daysBody"></tbody>
+      </table>
+    </section>
+
+    <section class="settings">
+      <h2>Configurações</h2>
+      <div class="settings-grid">
+        <label>Meta mensal (hh:mm)
+          <input id="cfgMeta" type="text" inputmode="numeric" placeholder="152:00">
+        </label>
+        <label>Jornada diária (hh:mm)
+          <input id="cfgJornada" type="text" inputmode="numeric" placeholder="08:00">
+        </label>
+        <label>Almoço padrão (hh:mm)
+          <input id="cfgAlmoco" type="text" inputmode="numeric" placeholder="01:00">
+        </label>
+      </div>
+      <p class="hint" id="cfgError" role="alert"></p>
+      <div class="actions">
+        <button id="exportJson" type="button">Exportar backup (JSON)</button>
+        <button id="importJson" type="button">Importar backup</button>
+        <button id="exportCsv" type="button">Exportar mês (CSV)</button>
+        <input id="importFile" type="file" accept="application/json,.json" hidden>
+      </div>
+      <p class="hint">Os registros ficam salvos apenas neste navegador (localStorage). Exporte um backup periodicamente.</p>
+    </section>
+  </main>
+
+  <footer>
+    <span id="version"></span>
+  </footer>
+
+  <script src="js/calc.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

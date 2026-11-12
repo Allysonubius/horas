@@ -1,0 +1,54 @@
+name: Release
+
+# Publica uma release ao enviar uma tag vX.Y.Z.
+# As notas vêm da seção correspondente do CHANGELOG.md.
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Testes
+        run: npm test
+
+      - name: Validar versão da tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          PKG="$(node -p "require('./package.json').version")"
+          if [ "$VERSION" != "$PKG" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME não corresponde à versão $PKG do package.json"
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Extrair notas do CHANGELOG
+        run: |
+          awk -v v="$VERSION" '
+            /^## \[/ { if (found) exit; if (index($0, "## [" v "]") == 1) { found = 1; next } }
+            found { print }
+          ' CHANGELOG.md > notes.md
+          if [ ! -s notes.md ]; then
+            echo "::error::Seção [$VERSION] não encontrada no CHANGELOG.md"
+            exit 1
+          fi
+
+      - name: Empacotar
+        run: zip -r "horas-$GITHUB_REF_NAME.zip" index.html css js scripts package.json README.md CHANGELOG.md
+
+      - name: Criar release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" "horas-$GITHUB_REF_NAME.zip" \
+            --title "$GITHUB_REF_NAME" --notes-file notes.md --verify-tag
