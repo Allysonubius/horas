@@ -33,6 +33,7 @@ Na primeira abertura:
 - **Registro diário**: entrada, saída para o almoço, retorno e saída. O almoço é opcional.
 - **Almoço**: a duração registrada aparece em cada dia e somada no mês, e não conta como hora trabalhada. Durante o almoço, o painel "Hoje" mostra o retorno previsto.
 - **Resumo do mês**: trabalhado, quanto falta para a meta, saldo (banco) frente à jornada diária e projeção de fechamento.
+- **Previsão do dia**: ao digitar a entrada, cada campo ainda vazio mostra o horário previsto (saída para o almoço, retorno e saída) para fechar a jornada, e a previsão se ajusta a cada horário informado. O painel "Hoje" mostra também as horas trabalhadas até agora e como o mês fica se o dia fechar como previsto.
 - **Painel "Hoje"**: com a entrada preenchida, mostra a saída para cumprir a jornada e a saída ajustada pelo saldo acumulado — mais cedo se o saldo é positivo, mais tarde se é negativo. Enquanto o retorno do almoço não é informado, considera o almoço padrão.
 - **Feriados**: os feriados nacionais do Brasil são identificados automaticamente, inclusive os móveis (Sexta-feira Santa), e não contam como dia útil na meta. Carnaval e Corpus Christi (pontos facultativos) podem ser incluídos por empresa.
 - **Bandeja do sistema**: ao minimizar, o aplicativo fica no ícone ao lado do relógio, sem ocupar a barra de tarefas. Um clique reabre a janela; o botão direito oferece Abrir, Bloquear e Sair. Fechar a janela (X) encerra o aplicativo.

@@ -239,4 +239,8 @@ tr.msg.info td { color: var(--muted); }
 #updateStatus::before { content: " · "; }
 #updateStatus:empty::before { content: ""; }
 
+/* Horário previsto abaixo de um campo ainda não preenchido */
+.prev { display: block; margin-top: 3px; font-size: 0.8rem; font-weight: 600; color: var(--accent); font-variant-numeric: tabular-nums; }
+.prev:empty { display: none; }
+
 [hidden] { display: none !important; }

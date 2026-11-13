@@ -3,6 +3,14 @@
 Todas as mudanças relevantes deste projeto são registradas aqui.
 O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o projeto adota [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+## [2.4.0] - 2026-11-13
+
+### Adicionado
+
+- Previsão do dia conforme os horários são digitados: abaixo de cada campo ainda vazio aparece o horário previsto (saída para o almoço, retorno e saída) para fechar a jornada.
+- Resumo da previsão em cada dia em andamento: almoço, saída e total do dia.
+- No painel "Hoje": previsão completa do dia, horas trabalhadas até agora (atualizadas sozinhas) e como o mês fica se o dia fechar como previsto.
+
 ## [2.3.0] - 2026-11-12
 
 ### Adicionado

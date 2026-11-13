@@ -10,7 +10,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  const VERSION = '2.3.0';
+  const VERSION = '2.4.0';
 
   const DEFAULT_SETTINGS = Object.freeze({
     metaMensal: 152 * 60, // 152:00
@@ -260,6 +260,48 @@
   }
 
   /**
+   * Previsão de como o dia fecha, a partir do que já foi digitado.
+   * Os horários ainda não informados são estimados para cumprir a jornada: almoço na metade da
+   * jornada, com a duração padrão, e saída ao completar as horas do dia.
+   * nowMinutes (opcional): horário atual, para calcular o que já foi trabalhado até agora.
+   * Retorna null sem entrada. Em `previsto`, true indica horário estimado (não digitado).
+   */
+  function dayForecast(rec, settings, nowMinutes) {
+    const s = settings || DEFAULT_SETTINGS;
+    const r = rec || {};
+    const e = parseTime(r.entrada);
+    if (e === null) return null;
+    const reg = { sa: parseTime(r.saidaAlmoco), ra: parseTime(r.retornoAlmoco), sd: parseTime(r.saida) };
+    let { sa, ra, sd } = reg;
+    const previsto = { saidaAlmoco: false, retornoAlmoco: false, saida: false };
+
+    if (sd === null) {
+      if (sa === null && ra === null && s.almocoPadrao > 0) {
+        sa = e + Math.floor(s.jornadaDiaria / 2);
+        previsto.saidaAlmoco = true;
+      }
+      if (sa !== null && ra === null) {
+        ra = sa + s.almocoPadrao;
+        previsto.retornoAlmoco = true;
+      }
+      const manha = sa !== null ? sa - e : 0;
+      sd = Math.max((ra !== null ? ra : e) + (s.jornadaDiaria - manha), ra !== null ? ra : e);
+      previsto.saida = true;
+    }
+    const almoco = sa !== null && ra !== null ? ra - sa : 0;
+
+    let ateAgora = null;
+    if (typeof nowMinutes === 'number') {
+      const ate = (inicio) => Math.max(nowMinutes - inicio, 0);
+      if (reg.sd !== null) ateAgora = reg.sd - e - almoco;
+      else if (reg.ra !== null && reg.sa !== null) ateAgora = (reg.sa - e) + ate(reg.ra);
+      else if (reg.sa !== null) ateAgora = reg.sa - e;
+      else ateAgora = ate(e);
+    }
+    return { entrada: e, saidaAlmoco: sa, retornoAlmoco: ra, saida: sd, almoco, total: sd - e - almoco, previsto, ateAgora };
+  }
+
+  /**
    * Sugestões de saída para um dia em andamento.
    * balanceBefore: saldo acumulado nos demais dias concluídos do mês.
    */
@@ -293,5 +335,6 @@
     exitTimeFor,
     summarizeMonth,
     exitSuggestions,
+    dayForecast,
   };
 });

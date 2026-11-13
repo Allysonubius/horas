@@ -116,13 +116,15 @@
       });
       tr.append(el('td', null, [select]));
 
+      const prevs = {}; // horário previsto, exibido abaixo de cada campo ainda não preenchido
       for (const f of M.FIELDS) {
         const input = el('input', { type: 'time', value: rec[f] || '', ariaLabel: FIELD_NAMES[f] + ' dia ' + d });
         input.addEventListener('input', () => {
           setField(iso, f, input.value);
           refresh();
         });
-        tr.append(el('td', null, [input]));
+        prevs[f] = el('small', { className: 'prev' });
+        tr.append(el('td', null, [input, prevs[f]]));
       }
 
       const lunch = el('td', { className: 'num' });
@@ -135,7 +137,7 @@
       const msgCell = el('td', { colSpan: 10 });
       const msgRow = el('tr', { className: 'msg', hidden: true }, [msgCell]);
       body.append(tr, msgRow);
-      rows.set(iso, { tr, lunch, total, balance, msgRow, msgCell });
+      rows.set(iso, { tr, prevs, lunch, total, balance, msgRow, msgCell });
     }
   }
 
@@ -145,6 +147,22 @@
     node.textContent = H.formatDuration(minutes, true);
     node.classList.toggle('pos', minutes > 0);
     node.classList.toggle('neg', minutes < 0);
+  }
+
+  function nowMinutes() {
+    const d = new Date();
+    return d.getHours() * 60 + d.getMinutes();
+  }
+
+  /** "almoço 12:15 às 13:15 (01:00) · saída 17:15 · total 08:00" */
+  function forecastText(fc) {
+    const partes = [];
+    if (fc.saidaAlmoco !== null) {
+      partes.push('almoço ' + clock(fc.saidaAlmoco) + ' às ' + clock(fc.retornoAlmoco) + ' (' + H.formatDuration(fc.almoco) + ')');
+    }
+    partes.push('saída ' + clock(fc.saida));
+    partes.push('total ' + H.formatDuration(fc.total));
+    return partes.join(' · ');
   }
 
   function clock(minutes) {
@@ -168,12 +186,17 @@
       if (p.balance === null) r.balance.textContent = '';
       else setSigned(r.balance, p.balance);
 
+      // Previsão do dia em andamento: horários estimados abaixo dos campos vazios e resumo na linha.
+      const emAndamento = !p.errors.length && !p.complete && !p.empty && p.tipo === H.TIPOS.TRABALHO;
+      const fc = emAndamento ? H.dayForecast(rec, s, p.iso === today ? nowMinutes() : null) : null;
+      for (const f of M.FIELDS) r.prevs[f].textContent = fc && fc.previsto[f] ? 'prev. ' + clock(fc[f]) : '';
+
       let msg = '';
       if (p.errors.length) {
         msg = p.errors.join(' ');
-      } else if (!p.complete && !p.empty) {
-        const exit = H.exitTimeFor(rec, s.jornadaDiaria, s);
-        if (exit !== null) msg = 'Em andamento — saída prevista para cumprir a jornada: ' + clock(exit);
+      } else if (fc) {
+        msg = 'Previsão do dia: ' + forecastText(fc) +
+          (fc.ateAgora !== null ? ' · trabalhado até agora ' + H.formatDuration(fc.ateAgora) : '');
       }
       r.msgCell.textContent = msg;
       r.msgRow.classList.toggle('info', !!msg && !p.errors.length);
@@ -248,6 +271,15 @@
       line('Registre a entrada para ver o horário de saída sugerido.');
     } else {
       const sug = H.exitSuggestions(rec, sum.balance, s);
+      const fc = H.dayForecast(rec, s, nowMinutes());
+      line('Previsão de hoje: entrada ', bold(rec.entrada), ' · ', forecastText(fc), '.');
+      const faltaHoje = Math.max(s.jornadaDiaria - fc.ateAgora, 0);
+      line('Trabalhado até agora: ', bold(H.formatDuration(fc.ateAgora)),
+        faltaHoje ? ' (faltam ' + H.formatDuration(faltaHoje) + ' para a jornada).' : ' (jornada cumprida).');
+      const mesPrevisto = sum.worked - p.minutes + fc.total;
+      line('Fechando o dia como previsto, o mês vai a ', bold(H.formatDuration(mesPrevisto)), ' de ',
+        H.formatDuration(sum.goal), Math.max(sum.goal - mesPrevisto, 0)
+          ? ' (faltarão ' + H.formatDuration(sum.goal - mesPrevisto) + ').' : ' (meta atingida).');
       const assumed = H.parseTime(rec.retornoAlmoco) === null
         ? ' (considerando almoço de ' + H.formatDuration(s.almocoPadrao) + ')' : '';
       const saiuAlmoco = H.parseTime(rec.saidaAlmoco);
@@ -739,6 +771,11 @@
     if (ev.target.files[0]) importJson(ev.target.files[0]);
     ev.target.value = '';
   });
+
+  // Mantém "trabalhado até agora" e as previsões em dia enquanto o aplicativo fica aberto.
+  setInterval(() => {
+    if (empresa() && !document.hidden && !document.body.classList.contains('locked')) refresh();
+  }, 30000);
 
   $('version').textContent = 'Registro de Horas v' + H.VERSION;
   $('storageHint').textContent = desktop

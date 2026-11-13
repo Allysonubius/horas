@@ -164,3 +164,36 @@ test('feriado em dia útil não conta como dia de trabalho', () => {
   assert.equal(sum.balance, 360);
   assert.equal(sum.remainingWorkdays, 19); // o feriado nunca entrou na conta de dias úteis
 });
+
+test('previsão do dia: só com a entrada estima almoço e saída', () => {
+  const p = H.dayForecast({ entrada: '08:15' }, S);
+  assert.deepEqual([p.saidaAlmoco, p.retornoAlmoco, p.saida], [12 * 60 + 15, 13 * 60 + 15, 17 * 60 + 15]);
+  assert.deepEqual(p.previsto, { saidaAlmoco: true, retornoAlmoco: true, saida: true });
+  assert.deepEqual([p.total, p.almoco], [480, 60]);
+  assert.equal(H.dayForecast({}, S), null);
+  // a saída prevista coincide com a sugestão já usada no painel "Hoje"
+  assert.equal(p.saida, H.exitTimeFor({ entrada: '08:15' }, 480, S));
+});
+
+test('previsão do dia: usa o que já foi digitado', () => {
+  const almocando = H.dayForecast({ entrada: '08:00', saidaAlmoco: '11:30' }, S);
+  assert.deepEqual([almocando.retornoAlmoco, almocando.saida, almocando.total], [12 * 60 + 30, 17 * 60, 480]);
+  assert.deepEqual(almocando.previsto, { saidaAlmoco: false, retornoAlmoco: true, saida: true });
+  const voltou = H.dayForecast({ entrada: '08:00', saidaAlmoco: '12:00', retornoAlmoco: '13:30' }, S);
+  assert.deepEqual([voltou.saida, voltou.almoco, voltou.total], [17 * 60 + 30, 90, 480]);
+  assert.deepEqual(voltou.previsto, { saidaAlmoco: false, retornoAlmoco: false, saida: true });
+  const fechado = H.dayForecast(full('08:00', '12:00', '13:00', '18:00'), S);
+  assert.deepEqual([fechado.total, fechado.previsto.saida], [540, false]);
+  // sem almoço padrão, não estima almoço
+  const direto = H.dayForecast({ entrada: '08:00' }, { ...S, jornadaDiaria: 360, almocoPadrao: 0 });
+  assert.deepEqual([direto.saidaAlmoco, direto.saida, direto.total], [null, 14 * 60, 360]);
+});
+
+test('previsão do dia: horas trabalhadas até agora', () => {
+  assert.equal(H.dayForecast({ entrada: '08:00' }, S, 10 * 60 + 30).ateAgora, 150);
+  assert.equal(H.dayForecast({ entrada: '08:00' }, S, 7 * 60).ateAgora, 0);
+  assert.equal(H.dayForecast({ entrada: '08:00', saidaAlmoco: '12:00' }, S, 12 * 60 + 40).ateAgora, 240);
+  assert.equal(H.dayForecast({ entrada: '08:00', saidaAlmoco: '12:00', retornoAlmoco: '13:00' }, S, 15 * 60).ateAgora, 360);
+  assert.equal(H.dayForecast(full('08:00', '12:00', '13:00', '17:00'), S, 23 * 60).ateAgora, 480);
+  assert.equal(H.dayForecast({ entrada: '08:00' }, S).ateAgora, null);
+});
